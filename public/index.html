@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Wall Wonderful</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/animations.css" />
+</head>
+<body>
+  <div id="particles"></div>
+
+  <header class="header">
+    <h1 class="title">Image Wall</h1>
+    <button id="shuffle-btn" class="shuffle-btn" title="Shuffle photos">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 3 21 3 21 8"></polyline>
+        <line x1="4" y1="20" x2="21" y2="3"></line>
+        <polyline points="21 16 21 21 16 21"></polyline>
+        <line x1="15" y1="15" x2="21" y2="21"></line>
+        <line x1="4" y1="4" x2="9" y2="9"></line>
+      </svg>
+      <span>Shuffle</span>
+    </button>
+    <span id="photo-count" class="photo-count"></span>
+  </header>
+
+  <div id="photo-wall" class="photo-wall"></div>
+
+  <div id="lightbox" class="lightbox">
+    <button class="lightbox-close" title="Close">&times;</button>
+    <button class="lightbox-nav prev" title="Previous">&#10094;</button>
+    <button class="lightbox-nav next" title="Next">&#10095;</button>
+    <div class="lightbox-content">
+      <img id="lightbox-img" src="" alt="" />
+    </div>
+    <div id="lightbox-counter" class="lightbox-counter"></div>
+  </div>
+
+  <div id="empty-state" class="empty-state" style="display: none">
+    <div class="empty-icon">📷</div>
+    <h2>No Photos Found</h2>
+    <p>Mount a photo directory to start the magic.</p>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
