@@ -4,11 +4,15 @@ RUN addgroup -S app && adduser -S app -G app
 
 WORKDIR /app
 
-COPY server/package.json server/package-lock.json* ./
-COPY server/index.js ./
+COPY server ./server
 COPY public ./public
 
+WORKDIR /app/server
 RUN npm install --omit=dev
+WORKDIR /app
+
+# 在切换用户之前创建目录并设置所有权
+RUN mkdir -p /app/thumbnails && chown -R app:app /app
 
 USER app
 
@@ -16,7 +20,4 @@ EXPOSE 8080
 
 ENV PHOTOS_DIR=/photos THUMBNAILS_DIR=/app/thumbnails PORT=8080
 
-# Create thumbnails directory with write permissions
-RUN mkdir -p /app/thumbnails && chown app:app /app/thumbnails
-
-CMD ["node", "index.js"]
+CMD ["node", "server/index.js"]
