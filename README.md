@@ -43,26 +43,10 @@ Then open `http://localhost:3000` in your browser.
 
 ### Docker Deployment
 
+**Prerequisites:** Copy `.env.example` to `.env` and configure `PHOTOS_PATH` for your photo directory.
+
 **Option 1: Docker Compose (Recommended)**
 
-Create `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-services:
-  memory-lane:
-    image: ghcr.io/modderbug/memory_lane:latest
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./photos:/photos:ro
-    environment:
-      - PORT=8080
-      - PHOTOS_DIR=/photos
-    restart: unless-stopped
-```
-
-Run:
 ```bash
 docker-compose up -d
 ```
@@ -73,10 +57,16 @@ docker-compose up -d
 docker run -d \
   -p 8080:8080 \
   -v /path/to/your/photos:/photos:ro \
-  -e PORT=8080 \
   -e PHOTOS_DIR=/photos \
+  -e PORT=8080 \
   --name memory-lane \
-  ghcr.io/modderbug/memory_lane:latest
+  memory-lane:latest
+```
+
+**Build Image:**
+
+```bash
+docker build -t memory-lane:latest .
 ```
 
 **Environment Variables:**
@@ -84,25 +74,8 @@ docker run -d \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8080` | Server port |
-| `PHOTOS_DIR` | `/photos` | Directory containing photos (recursive) |
-
-**Dockerfile:**
-
-```dockerfile
-FROM node:20-alpine
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm install --production
-
-COPY public/ ./public/
-COPY server/ ./server/
-
-EXPOSE 8080
-
-CMD ["node", "server/index.js"]
-```
+| `PHOTOS_DIR` | `/photos` | Directory containing photos (mounted via volume) |
+| `PHOTOS_PATH` | - | Host path to photos (for docker-compose, set in `.env`) |
 
 ## Project Structure
 
@@ -115,7 +88,11 @@ CMD ["node", "server/index.js"]
 │   └── js/
 │       └── app.js      # Application logic
 ├── server/
-│   └── index.js        # Express server
+│   ├── index.js        # Express server
+│   └── package.json    # Node.js dependencies
+├── Dockerfile          # Docker image
+├── docker-compose.yml  # Docker Compose configuration
+├── .env.example        # Environment variables template
 └── README.md
 ```
 

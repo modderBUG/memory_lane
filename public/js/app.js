@@ -77,11 +77,11 @@
     } else if (W <= 1024) {
       cols = 6; // Small desktop: 6 columns
     } else {
-      cols = 8; // Desktop: 8 columns
+      cols = 6; // Desktop: 6 columns
     }
 
-    const cardW = 420;  // base card width (3x for desktop)
-    const cardH = 165;  // fixed card height (19:6 aspect ratio, 3x for desktop)
+    const cardW = 280;  // base card width (2x for desktop)
+    const cardH = 110;  // fixed card height (19:6 aspect ratio, 2x for desktop)
     const gapX = 8;     // horizontal gap between cards (compact)
     const gapY = 70;    // vertical spacing
 
@@ -108,8 +108,8 @@
       // Small rotation (-5 to 5 degrees, subtle)
       const rot = rand(-5, 5);
 
-      // Vary card size slightly
-      const w = rand(130, 160);
+      // Vary card size slightly (scaled with cardW)
+      const w = rand(cardW - 10, cardW + 20);
 
       positions.push({ x, y, rot, w });
     }

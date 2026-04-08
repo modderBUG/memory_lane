@@ -1,0 +1,11 @@
+services:
+  photo-wall:
+    build: .
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - ${PHOTOS_PATH:-./sample-photos}:/photos:ro
+    environment:
+      - PHOTOS_DIR=/photos
+      - PORT=8080
+    restart: unless-stopped
