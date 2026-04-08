@@ -14,6 +14,9 @@ USER app
 
 EXPOSE 8080
 
-ENV PHOTOS_DIR=/photos PORT=8080
+ENV PHOTOS_DIR=/photos THUMBNAILS_DIR=/app/thumbnails PORT=8080
+
+# Create thumbnails directory with write permissions
+RUN mkdir -p /app/thumbnails && chown app:app /app/thumbnails
 
 CMD ["node", "index.js"]

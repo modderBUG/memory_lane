@@ -2,6 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import sharp from 'sharp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,24 +10,65 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const PHOTOS_DIR = process.env.PHOTOS_DIR || '/photos';
+const THUMBNAILS_DIR = process.env.THUMBNAILS_DIR || path.join(__dirname, '..', 'thumbnails');
 const MIN_PHOTOS = 8;
 const MAX_PHOTOS = 50;
 const CACHE_TTL = 30_000;
 
+// 缩略图配置
+const THUMB_WIDTH = 300;
+const THUMB_HEIGHT = 120;
+const THUMB_QUALITY = 80;
+
+// 确保缩略图目录存在
+if (!fs.existsSync(THUMBNAILS_DIR)) {
+  fs.mkdirSync(THUMBNAILS_DIR, { recursive: true });
+}
+
 const IMAGE_EXTENSIONS = new Set([
-  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.tif',
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif',
 ]);
 
 let photoCache = { files: [], mtime: 0, expires: 0 };
 
-function walkDirectory(dir) {
+// 生成缩略图文件路径（保持原文件名，不添加额外扩展名）
+function getThumbPath(originalPath) {
+  const relPath = path.relative(PHOTOS_DIR, originalPath);
+  return path.join(THUMBNAILS_DIR, relPath);
+}
+
+// 生成缩略图
+async function generateThumbnail(sourcePath, thumbPath) {
+  try {
+    const thumbDir = path.dirname(thumbPath);
+    if (!fs.existsSync(thumbDir)) {
+      fs.mkdirSync(thumbDir, { recursive: true });
+    }
+
+    await sharp(sourcePath)
+      .resize(THUMB_WIDTH, THUMB_HEIGHT, {
+        fit: 'cover',
+        position: 'center'
+      })
+      .jpeg({ quality: THUMB_QUALITY })
+      .toFile(thumbPath);
+
+    return true;
+  } catch (err) {
+    console.error(`Failed to generate thumbnail for ${sourcePath}:`, err.message);
+    return false;
+  }
+}
+
+async function walkDirectory(dir) {
   const photos = [];
   try {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const e of entries) {
       const full = path.join(dir, e.name);
       if (e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules') {
-        photos.push(...walkDirectory(full));
+        const subPhotos = await walkDirectory(full);
+        photos.push(...subPhotos);
       } else if (e.isFile()) {
         const ext = path.extname(e.name).toLowerCase();
         if (IMAGE_EXTENSIONS.has(ext)) {
@@ -34,10 +76,30 @@ function walkDirectory(dir) {
           const urlPath = relDir
             ? relDir.replace(/\\/g, '/') + '/' + e.name
             : e.name;
-          photos.push({
+
+          const thumbPath = getThumbPath(full);
+
+          // 同步生成缩略图（确保存在）
+          if (!fs.existsSync(thumbPath)) {
+            try {
+              await generateThumbnail(full, thumbPath);
+            } catch (err) {
+              console.error(`Thumbnail generation failed for ${full}:`, err.message);
+            }
+          }
+
+          const thumbExists = fs.existsSync(thumbPath);
+          // thumbUrl 路径和原图路径对应，只是目录不同
+          const thumbUrlPath = urlPath.split('/').map(encodeURIComponent).join('/');
+
+          const photo = {
             name: e.name,
-            url: '/photos/' + urlPath.split('/').map(encodeURIComponent).join('/'),
-          });
+            url: '/photos/' + thumbUrlPath,
+            thumbUrl: thumbExists ? '/thumbnails/' + thumbUrlPath : null,
+            fullPath: full
+          };
+
+          photos.push(photo);
         }
       }
     }
@@ -47,7 +109,7 @@ function walkDirectory(dir) {
   return photos;
 }
 
-function getPhotos() {
+async function getPhotos() {
   const now = Date.now();
   if (now < photoCache.expires && photoCache.files.length > 0) {
     return photoCache.files;
@@ -58,7 +120,7 @@ function getPhotos() {
     if (stat.mtimeMs <= photoCache.mtime && now < photoCache.expires + 60_000) {
       return photoCache.files;
     }
-    const files = walkDirectory(PHOTOS_DIR);
+    const files = await walkDirectory(PHOTOS_DIR);
     photoCache = { files, mtime: stat.mtimeMs, expires: now + CACHE_TTL };
     return files;
   } catch {
@@ -96,8 +158,8 @@ function partialShuffle(arr, n) {
 }
 
 // API endpoint - supports pagination
-app.get('/api/photos', (req, res) => {
-  const photos = getPhotos();
+app.get('/api/photos', async (req, res) => {
+  const photos = await getPhotos();
   const total = photos.length;
 
   // Parse pagination params
@@ -120,8 +182,11 @@ app.get('/api/photos', (req, res) => {
   });
 });
 
-// Serve photos directory
-app.use('/photos', express.static(PHOTOS_DIR, { index: false }));
+// Serve thumbnails directory
+app.use('/thumbnails', express.static(THUMBNAILS_DIR, { index: false, maxAge: '1d' }));
+
+// Serve photos directory (original images)
+app.use('/photos', express.static(PHOTOS_DIR, { index: false, maxAge: '1h' }));
 
 // Serve frontend
 const publicDir = path.resolve(__dirname, '..', 'public');

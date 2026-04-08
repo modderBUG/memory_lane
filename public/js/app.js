@@ -18,7 +18,11 @@
 
   const floatClasses = ['float-1','float-2','float-3','float-4','float-5'];
   const heartEmojis = ['\u2764','\uD83E\uDD0E','\uD83C\uDF4A','\uD83E\UDDE1','\u2728','\uD83D\uDC9B','\uD83D\uDC96','\uD83D\uDC9D'];
+  const rosePetals = ['\uD83C\uDF39','\uD83C\uDF3A','\uD83C\uDF38']; // rose, hibiscus, cherry blossom
   let heartThrottle = 0;
+  let mouseX = window.innerWidth / 2;
+  let mouseY = window.innerHeight / 2;
+  const petalElements = [];
   const warmColors = [
     'rgba(255,183,130,0.5)','rgba(244,162,148,0.4)','rgba(242,198,122,0.4)',
     'rgba(248,170,160,0.35)','rgba(255,200,170,0.45)','rgba(255,160,122,0.4)',
@@ -36,6 +40,7 @@
     createFireflies();
     createSparkles();
     createGlowRings();
+    createRosePetals();
     bindEvents();
     shuffleBtn.classList.add('pulse');
   }
@@ -151,14 +156,26 @@
       shimmer.className = 'shimmer';
       card.appendChild(shimmer);
 
-      // Image
+      // Image - use thumbnail for display, fallback to original
       const img = document.createElement('img');
-      img.src = photo.url;
+      img.src = photo.thumbUrl || photo.url;  // Load thumbnail or fallback to original
       img.alt = photo.name;
       img.loading = 'lazy';
       img.style.width = pos.w + 'px';
       img.style.minHeight = (pos.w * 0.6) + 'px';
+
+      // Fallback to original if thumbnail fails
+      img.onerror = () => {
+        if (photo.url && img.src !== photo.url) {
+          img.src = photo.url;
+        }
+      };
+
       img.onload = () => card.classList.add('loaded');
+
+      // Store original image URL for lightbox
+      card.dataset.originalUrl = photo.url;
+
       card.appendChild(img);
 
       // Store base rotation for hover
@@ -208,6 +225,65 @@
     });
     document.body.appendChild(heart);
     heart.addEventListener('animationend', () => heart.remove());
+  }
+
+  /* ---- Rose Petal Explosion ---- */
+  function spawnRoseExplosion(x, y) {
+    const particleCount = 30;
+    for (let i = 0; i < particleCount; i++) {
+      const petal = document.createElement('span');
+      petal.className = 'rose-explosion';
+      petal.textContent = rosePetals[Math.floor(Math.random() * rosePetals.length)];
+      const size = rand(18, 32);
+      const angle = (Math.PI * 2 * i) / particleCount + rand(-0.3, 0.3);
+      const velocity = rand(120, 220);
+      const vx = Math.cos(angle) * velocity;
+      const vy = Math.sin(angle) * velocity - rand(150, 250);
+      const rotation = rand(0, 360);
+      const gravity = rand(400, 600);
+
+      petal.style.left = x + 'px';
+      petal.style.top = y + 'px';
+      petal.style.fontSize = size + 'px';
+
+      document.body.appendChild(petal);
+
+      // Smooth physics-based animation with natural gravity
+      const startTime = performance.now();
+      const duration = 2500;
+
+      function animate(currentTime) {
+        const elapsed = (currentTime - startTime) / 1000;
+        const progress = Math.min(elapsed / (duration / 1000), 1);
+
+        // Horizontal: constant velocity (no acceleration)
+        const currentX = vx * elapsed;
+
+        // Vertical: initial upward velocity + gravity acceleration
+        // y = v0*t + 0.5*g*t^2
+        const currentY = vy * elapsed + 0.5 * gravity * elapsed * elapsed;
+
+        // Rotation: smooth continuous spin
+        const currentRot = rotation + (rand(360, 720) * progress);
+
+        // Scale: start small, expand, then shrink at end
+        const scale = 0.6 + Math.sin(progress * Math.PI) * 0.5 - progress * 0.3;
+
+        // Opacity: fade out gradually
+        const opacity = 1 - Math.pow(progress, 0.7);
+
+        petal.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${currentRot}deg) scale(${Math.max(0.2, scale)})`;
+        petal.style.opacity = opacity;
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          petal.remove();
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
   }
 
   /* ---- Particles ---- */
@@ -292,24 +368,96 @@
     }
   }
 
+  /* ---- Rose Petals ---- */
+  function createRosePetals() {
+    for (let i = 0; i < 60; i++) {
+      const petal = document.createElement('div');
+      petal.className = 'rose-petal';
+      const petalEmoji = rosePetals[Math.floor(Math.random() * rosePetals.length)];
+      const size = rand(16, 28);
+      const fallDuration = rand(8, 15);
+      const swayDuration = rand(2, 5);
+      const startLeft = rand(-10, 100);
+      const delay = rand(-15, 5);
+      Object.assign(petal.style, {
+        left: startLeft + 'vw',
+        fontSize: size + 'px',
+        '--fall-duration': fallDuration + 's',
+        '--sway-duration': swayDuration + 's',
+        animationDelay: `${delay}s, ${rand(-3, 3)}s`,
+      });
+      petal.textContent = petalEmoji;
+      petal.dataset.startX = startLeft;
+      particlesEl.appendChild(petal);
+      petalElements.push(petal);
+    }
+    animatePetals();
+  }
+
+  function animatePetals() {
+    function update() {
+      const rect = particlesEl.getBoundingClientRect();
+      petalElements.forEach((petal) => {
+        const petalRect = petal.getBoundingClientRect();
+        const petalX = petalRect.left + petalRect.width / 2;
+        const petalY = petalRect.top + petalRect.height / 2;
+
+        const dx = mouseX - petalX;
+        const dy = mouseY - petalY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const interactDist = 150;
+
+        if (dist < interactDist) {
+          const force = (interactDist - dist) / interactDist;
+          const moveX = (dx / dist) * force * 50;
+          const moveY = (dy / dist) * force * 30;
+          petal.style.transform = `translate(${moveX}px, ${moveY}px)`;
+          petal.classList.add('mouse-nearby');
+        } else {
+          petal.style.transform = '';
+          petal.classList.remove('mouse-nearby');
+        }
+      });
+      requestAnimationFrame(update);
+    }
+    update();
+  }
+
   /* ---- Utility ---- */
   function rand(a, b) { return Math.random() * (b - a) + a; }
 
   /* ---- Lightbox ---- */
   function openLightbox(index) {
     currentIndex = index;
+    preloadOriginalImage(index);
     updateLightboxImage();
     lightboxEl.classList.add('active');
     document.body.style.overflow = 'hidden';
     resetIdle();
   }
+
+  function preloadOriginalImage(index) {
+    // Preload current and adjacent images
+    for (let i = -1; i <= 1; i++) {
+      const idx = (index + i + totalPhotos) % totalPhotos;
+      const photo = photos[idx];
+      if (photo && !photo._originalLoaded) {
+        const img = new Image();
+        img.src = photo.url;
+        photo._originalLoaded = true;
+      }
+    }
+  }
+
   function closeLightbox() {
     lightboxEl.classList.remove('active');
     document.body.style.overflow = '';
   }
+
   function updateLightboxImage() {
     const photo = photos[currentIndex];
     if (!photo) return;
+    // Use original image URL for lightbox
     lightboxImg.src = photo.url;
     lightboxImg.alt = photo.name;
     lightboxCounter.textContent = `${currentIndex + 1} / ${totalPhotos}`;
@@ -351,6 +499,14 @@
     ['mousemove','keydown','scroll','touchstart','click'].forEach(evt => {
       window.addEventListener(evt, resetIdle, { passive: true });
     });
+    window.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    }, { passive: true });
+    window.addEventListener('click', (e) => {
+      if (e.target.closest('.lightbox')) return;
+      spawnRoseExplosion(e.clientX, e.clientY);
+    }, { passive: true });
   }
 
   init();
