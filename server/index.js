@@ -10,6 +10,7 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const PHOTOS_DIR = process.env.PHOTOS_DIR || '/photos';
 const MIN_PHOTOS = 8;
+const MAX_PHOTOS = 50;
 const CACHE_TTL = 30_000;
 
 const IMAGE_EXTENSIONS = new Set([
@@ -83,10 +84,40 @@ function fillPhotos(arr, min) {
   return result;
 }
 
-// API endpoint
+// Partial shuffle - only shuffle first n elements for efficiency
+function partialShuffle(arr, n) {
+  const a = [...arr];
+  const len = a.length;
+  for (let i = 0; i < Math.min(n, len); i++) {
+    const j = i + Math.floor(Math.random() * (len - i));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, n);
+}
+
+// API endpoint - supports pagination
 app.get('/api/photos', (req, res) => {
   const photos = getPhotos();
-  res.json(fillPhotos(photos, MIN_PHOTOS));
+  const total = photos.length;
+
+  // Parse pagination params
+  const limit = Math.min(parseInt(req.query.limit) || MAX_PHOTOS, MAX_PHOTOS);
+  const offset = parseInt(req.query.offset) || 0;
+
+  // Efficient partial shuffle - only shuffle what we need
+  const shuffled = partialShuffle(photos, offset + limit);
+  const result = shuffled.slice(offset);
+
+  // Fill if needed
+  const filled = fillPhotos(result, MIN_PHOTOS);
+
+  res.json({
+    photos: filled,
+    total,
+    limit: filled.length,
+    offset,
+    hasMore: offset + filled.length < total
+  });
 });
 
 // Serve photos directory

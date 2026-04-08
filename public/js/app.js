@@ -1,9 +1,11 @@
 (() => {
   const MAX_PHOTOS = 50;
+  const IDLE_TIMEOUT = 45_000;
+
   let photos = [];
+  let totalPhotos = 0;
   let currentIndex = 0;
   let idleTimer = null;
-  const IDLE_TIMEOUT = 45_000;
 
   const wallEl = document.getElementById('photo-wall');
   const lightboxEl = document.getElementById('lightbox');
@@ -41,10 +43,13 @@
   /* ---- Fetch ---- */
   async function fetchPhotos() {
     try {
-      const res = await fetch('/api/photos');
+      const res = await fetch(`/api/photos?limit=${MAX_PHOTOS}`);
       if (!res.ok) throw new Error('API error');
-      const all = await res.json();
-      photos = all.slice(0, MAX_PHOTOS);
+      const data = await res.json();
+
+      photos = data.photos;
+      totalPhotos = data.total;
+
       if (!photos.length) {
         wallEl.style.display = 'none';
         emptyEl.style.display = 'flex';
@@ -52,7 +57,7 @@
       } else {
         wallEl.style.display = '';
         emptyEl.style.display = 'none';
-        countEl.textContent = `showing ${photos.length} / ${all.length}`;
+        countEl.textContent = `showing ${photos.length} / ${totalPhotos}`;
         renderCards();
       }
     } catch (err) {
@@ -131,7 +136,7 @@
     const positions = calcPositions();
 
     photos.forEach((photo, i) => {
-      const pos = positions[i % positions.length];
+      const pos = positions[i];
       const card = document.createElement('div');
       card.className = 'photo-card card-enter';
       card.style.animationDelay = `${i * 0.03}s`;
@@ -139,6 +144,7 @@
       card.style.top = pos.y + 'px';
       card.style.zIndex = i + 1;
       card.style.transform = `rotate(${pos.rot}deg)`;
+      card.dataset.index = i;
 
       // Shimmer
       const shimmer = document.createElement('div');
@@ -306,10 +312,10 @@
     if (!photo) return;
     lightboxImg.src = photo.url;
     lightboxImg.alt = photo.name;
-    lightboxCounter.textContent = `${currentIndex + 1} / ${photos.length}`;
+    lightboxCounter.textContent = `${currentIndex + 1} / ${totalPhotos}`;
   }
   function navLightbox(dir) {
-    currentIndex = (currentIndex + dir + photos.length) % photos.length;
+    currentIndex = (currentIndex + dir + totalPhotos) % totalPhotos;
     updateLightboxImage();
     resetIdle();
   }
@@ -317,6 +323,7 @@
   /* ---- Shuffle ---- */
   function doShuffle() {
     shuffleBtn.classList.remove('pulse');
+    photos = [];
     wallEl.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
     fetchPhotos();
     setTimeout(() => shuffleBtn.classList.add('pulse'), 3000);
